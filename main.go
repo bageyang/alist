@@ -1,16 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"github.com/alist-org/alist/v3/drivers/kuwo"
 )
 
 func main() {
 	//cmd.Execute()
-	music, err := kuwo.SearchKuwoMusic("周杰伦", 1, 10)
-	if err != nil {
-		print("错误")
-		return
-	}
-	print("=================================")
-	print(music.Total)
+	//kuwo.GetDownloadUrl("108414", "mp3", "")
+	format := kuwo.SearchMusicPic("108414")
+	fmt.Printf("%+v", format)
 }
