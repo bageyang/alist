@@ -47,3 +47,9 @@ type KuwoLrc struct {
 type KuwoPicRsp struct {
 	PicList []map[string]string `json:"array"`
 }
+
+type Ret[T any] struct {
+	Code int    `json:"code"`
+	Data T      `json:"data"`
+	Msg  string `json:"msg"`
+}

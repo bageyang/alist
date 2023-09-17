@@ -71,6 +71,7 @@ func Init(e *gin.Engine) {
 
 	_fs(auth.Group("/fs"))
 	admin(auth.Group("/admin", middlewares.AuthAdmin))
+	music(auth.Group("/music", middlewares.AuthAdmin))
 	if flags.Debug || flags.Dev {
 		debug(g.Group("/debug"))
 	}
@@ -163,4 +164,8 @@ func Cors(r *gin.Engine) {
 	config.AllowHeaders = []string{"*"}
 	config.AllowMethods = []string{"*"}
 	r.Use(cors.New(config))
+}
+
+func music(g *gin.RouterGroup) {
+	g.Any("/search", handles.MusicSearch)
 }

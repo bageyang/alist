@@ -28,13 +28,22 @@ func MusicSearch(c *gin.Context) {
 		err error
 	)
 	if err = c.ShouldBind(&req); err != nil {
-		common.ErrorResp(c, err, 400)
+		fail(c, "参数错误")
 		return
 	}
 	err = req.Validate()
 	if err != nil {
+		fail(c, "参数错误")
 		return
 	}
-	kuwo.SearchKuwoMusic(req.Keywords, req.PageNo, req.PageSize)
+	music, err := kuwo.SearchKuwoMusic(req.Keywords, req.PageNo, req.PageSize)
+	if err != nil {
+		fail(c, "搜索异常")
+		return
+	}
+	common.SuccessResp(c, music)
+}
 
+func fail(c *gin.Context, msg string) {
+	common.ErrorStrResp(c, msg, 500)
 }
