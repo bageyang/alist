@@ -168,4 +168,5 @@ func Cors(r *gin.Engine) {
 
 func music(g *gin.RouterGroup) {
 	g.Any("/search", handles.MusicSearch)
+	g.Any("/addTask", handles.AddDownLoadTask)
 }

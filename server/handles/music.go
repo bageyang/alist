@@ -1,6 +1,7 @@
 package handles
 
 import (
+	"fmt"
 	"github.com/alist-org/alist/v3/drivers/kuwo"
 	"github.com/alist-org/alist/v3/server/common"
 	"github.com/gin-gonic/gin"
@@ -42,6 +43,20 @@ func MusicSearch(c *gin.Context) {
 		return
 	}
 	common.SuccessResp(c, music)
+}
+
+func AddDownLoadTask(c *gin.Context) {
+	var (
+		req []string
+		err error
+	)
+	if err = c.ShouldBind(&req); err != nil {
+		fail(c, "参数错误")
+		return
+	}
+	fmt.Printf("%+v", req)
+	kuwo.HandTask(req)
+	common.SuccessResp(c)
 }
 
 func fail(c *gin.Context, msg string) {
