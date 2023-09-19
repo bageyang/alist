@@ -15,7 +15,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"image"
 	"image/jpeg"
-	"io"
 	"os"
 	"sync"
 	"time"
@@ -31,12 +30,13 @@ var clientMu sync.Mutex
 var uploadPah = "/"
 
 type FileDeleteCloser struct {
-	TmpFile  *os.File
+	deletePath *os.File
 }
 
 func (f FileDeleteCloser) Close() error {
-	err := f.TmpFile.Close()
-	return err
+	//err := os.Remove(f.deletePath)
+	utils.Log.Infof("删除文件: %+v", f.deletePath)
+	return f.deletePath.Close()
 }
 
 func init() {
@@ -87,7 +87,6 @@ func HandTask(musicList []MusicInfo) bool {
 			utils.Log.Errorf("添加任务队列异常: %+v", err)
 		}
 	}
-
 	checkTask()
 	return true
 }
@@ -125,6 +124,9 @@ func startTask() {
 			downloadAndUploadMusic(music)
 		}
 	}
+	clientMu.Lock()
+	IsRuning = false
+	clientMu.Unlock()
 }
 
 func downloadAndUploadMusic(music *MusicInfo) {
@@ -134,14 +136,18 @@ func downloadAndUploadMusic(music *MusicInfo) {
 	if err != nil {
 		utils.Log.Infof("打开文件失败: %+v", err)
 	}
+	closers := utils.Closers{}
+	closer := FileDeleteCloser{file}
+	closers.Add(closer)
 	s := &stream.FileStream{
 		Obj: &model.Object{
 			Name:     music.Name,
 			Size:     fileInfo.Size(),
 			Modified: time.Now(),
 		},
+		//Reader:       file,
 		WebPutAsTask: true,
-		Closers: [],
+		Closers:      closers,
 	}
 	s.SetTmpFile(file)
 	fs.PutAsTask(uploadPah, s)
@@ -156,7 +162,7 @@ func downloadMusic(music *MusicInfo) string {
 	fileName := music.Artist + "-" + music.Name + "." + format.Format
 	music.Name = fileName
 	musicOutput := CacheDir + fileName
-	_, err := client.R().SetOutput(CacheDir + music.Name + "." + format.Format).Get(url)
+	_, err := client.R().SetOutput(CacheDir + music.Name).Get(url)
 	if err != nil {
 		utils.Log.Errorf("下载歌曲失败: %+v", err)
 	} else {
@@ -183,6 +189,7 @@ func FillMusicId3Tag(musicPath string, imagePath string, lyrics string, musicInf
 	tag, err := id3v2.Open(musicPath, id3v2.Options{Parse: true})
 	if err != nil {
 		utils.Log.Errorf("打开文件错误: %+v", err)
+		return
 	}
 
 	tag.SetTitle(musicInfo.Name)

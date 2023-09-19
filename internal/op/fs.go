@@ -573,7 +573,6 @@ func Put(ctx context.Context, storage driver.Driver, dstDirPath string, file mod
 				key := Key(storage, stdpath.Join(dstDirPath, file.GetName()))
 				linkCache.Del(key)
 			}
-			file.Io
 		}
 	}
 	return errors.WithStack(err)
