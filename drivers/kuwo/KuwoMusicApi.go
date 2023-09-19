@@ -29,6 +29,10 @@ var client = resty.New()
 const SearchUrl = "https://search.kuwo.cn/r.s?all=%s&ft=music&newsearch=1&alflac=1&itemset=web_2013&client=kt&cluster=0&pn=%d&rn=%d&vermerge=1&rformat=json&encoding=utf8&show_copyright_off=1&pcmp4=1&ver=mbox&vipver=MUSIC_8.7.7.1_BDS4&plat=pc&devid=76039576"
 
 func SearchKuwoMusic(text string, pageNo int, pageSize int) (*SearchRsp, error) {
+	if pageNo < 1 {
+		pageNo = 1
+	}
+	pageNo = pageNo - 1
 	url := fmt.Sprintf(SearchUrl, text, pageNo, pageSize)
 	searchDto := new(SearchRsp)
 	rsp, err := client.R().Get(url)
@@ -38,8 +42,10 @@ func SearchKuwoMusic(text string, pageNo int, pageSize int) (*SearchRsp, error) 
 	}
 	validJSON := strings.Replace(string(rsp.Body()), "'", "\"", -1)
 	json.Unmarshal([]byte(validJSON), searchDto)
-	for _, info := range searchDto.AbsList {
-		info.Album = strings.Replace(info.Album, "&nbsp;", "", -1)
+	for i := range searchDto.AbsList {
+		searchDto.AbsList[i].Album = strings.Replace(searchDto.AbsList[i].Album, "&nbsp;", "-", -1)
+		searchDto.AbsList[i].Artist = strings.Replace(searchDto.AbsList[i].Artist, "&nbsp;", "-", -1)
+		searchDto.AbsList[i].Name = strings.Replace(searchDto.AbsList[i].Name, "&nbsp;", "-", -1)
 	}
 	return searchDto, nil
 }
