@@ -1,7 +1,6 @@
 package kuwo
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -16,6 +15,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"image"
 	"image/jpeg"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -29,6 +29,15 @@ var IsRuning = false
 var clientMu sync.Mutex
 
 var uploadPah = "/"
+
+type FileDeleteCloser struct {
+	TmpFile  *os.File
+}
+
+func (f FileDeleteCloser) Close() error {
+	err := f.TmpFile.Close()
+	return err
+}
 
 func init() {
 	go watchUploadConfig()
@@ -125,16 +134,14 @@ func downloadAndUploadMusic(music *MusicInfo) {
 	if err != nil {
 		utils.Log.Infof("打开文件失败: %+v", err)
 	}
-	// 创建一个 Reader
-	reader := bufio.NewReader(file)
 	s := &stream.FileStream{
 		Obj: &model.Object{
 			Name:     music.Name,
 			Size:     fileInfo.Size(),
 			Modified: time.Now(),
 		},
-		Reader:       reader,
 		WebPutAsTask: true,
+		Closers: [],
 	}
 	s.SetTmpFile(file)
 	fs.PutAsTask(uploadPah, s)
