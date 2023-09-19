@@ -9,6 +9,7 @@ const (
 	ARIA2
 	INDEX
 	SSO
+	MUSIC
 )
 
 const (

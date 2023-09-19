@@ -1,12 +1,10 @@
 package main
 
-import (
-	"github.com/alist-org/alist/v3/cmd"
-)
+import "github.com/alist-org/alist/v3/cmd"
 
 func main() {
 	cmd.Execute()
-	//kuwo.GetDownloadUrl("108414", "mp3", "")
+	//kuwo.FillMusicId3Tag()
 	//format := kuwo.SearchMusicPic("108414")
 	//fmt.Printf("%+v", format)
 }

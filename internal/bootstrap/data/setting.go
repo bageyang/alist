@@ -169,6 +169,13 @@ func InitialSettings() []model.SettingItem {
 		// qbittorrent settings
 		{Key: conf.QbittorrentUrl, Value: "http://admin:adminadmin@localhost:8080/", Type: conf.TypeString, Group: model.SINGLE, Flag: model.PRIVATE},
 		{Key: conf.QbittorrentSeedtime, Value: "0", Type: conf.TypeNumber, Group: model.SINGLE, Flag: model.PRIVATE},
+
+		// music
+		{Key: conf.RedisAddr, Value: "localhost:6379", Type: conf.TypeString, Group: model.MUSIC, Flag: model.PRIVATE},
+		{Key: conf.RedisPassword, Value: "", Type: conf.TypeString, Group: model.MUSIC, Flag: model.PRIVATE},
+		{Key: conf.RedisDB, Value: "0", Type: conf.TypeNumber, Group: model.MUSIC, Flag: model.PRIVATE},
+		{Key: conf.UploadPath, Value: "/", Type: conf.TypeString, Group: model.MUSIC, Flag: model.PRIVATE},
+		{Key: conf.MusicCachePath, Value: "/", Type: conf.TypeString, Group: model.MUSIC, Flag: model.PRIVATE},
 	}
 	if flags.Dev {
 		initialSettingItems = append(initialSettingItems, []model.SettingItem{

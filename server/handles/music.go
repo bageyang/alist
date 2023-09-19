@@ -13,6 +13,10 @@ type MusicSearchReq struct {
 	PageNo   int    `json:"pageNo"`
 }
 
+type MusicList struct {
+	Musics []kuwo.MusicInfo `json:"musicList"`
+}
+
 func (p *MusicSearchReq) Validate() error {
 	if p.PageSize < 1 {
 		p.PageSize = 20
@@ -47,7 +51,7 @@ func MusicSearch(c *gin.Context) {
 
 func AddDownLoadTask(c *gin.Context) {
 	var (
-		req []string
+		req MusicList
 		err error
 	)
 	if err = c.ShouldBind(&req); err != nil {
@@ -55,8 +59,13 @@ func AddDownLoadTask(c *gin.Context) {
 		return
 	}
 	fmt.Printf("%+v", req)
-	kuwo.HandTask(req)
+	kuwo.HandTask(req.Musics)
 	common.SuccessResp(c)
+}
+
+func ListDownLoadTask(c *gin.Context) {
+	tasks := kuwo.ListUnHandTask()
+	common.SuccessResp(c, tasks)
 }
 
 func fail(c *gin.Context, msg string) {

@@ -2,8 +2,14 @@ package common
 
 import (
 	"context"
+	"github.com/alist-org/alist/v3/internal/conf"
+	"github.com/alist-org/alist/v3/internal/model"
+	"github.com/alist-org/alist/v3/internal/op"
+	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/redis/go-redis/v9"
+	"strconv"
 	"sync"
+	"time"
 )
 
 var (
@@ -20,6 +26,52 @@ func init() {
 		Addr:     "localhost:6379",
 		Password: "",
 		DB:       0,
+	}
+	go watchRedisConfig()
+}
+
+func watchRedisConfig() {
+	time.Sleep(time.Second * 30)
+	for {
+		groups, err := op.GetSettingItemsByGroup(model.MUSIC)
+		if err != nil {
+			utils.Log.Errorf("配置查询失败: %+v", err)
+			continue
+		}
+		changed := false
+		newOptions := &redis.Options{}
+		for _, group := range groups {
+			key := group.Key
+			value := group.Value
+			if key == conf.RedisAddr && len(value) > 0 {
+				newOptions.Addr = value
+				if clientOptions.Addr != value {
+					changed = true
+					break
+				}
+			}
+			if key == conf.RedisPassword && len(value) > 0 {
+				newOptions.Password = value
+				if clientOptions.Password != value {
+					changed = true
+					break
+				}
+			}
+			if key == conf.RedisDB && len(value) > 0 {
+				num, _ := strconv.Atoi(value)
+				newOptions.DB = num
+				if clientOptions.DB != num {
+					changed = true
+					break
+				}
+			}
+		}
+		if changed {
+			ResetRedisClient(newOptions)
+			clientOptions = newOptions
+			utils.Log.Infof("Redis 加载新配置: %+v", clientOptions)
+		}
+		time.Sleep(time.Second * 30)
 	}
 }
 

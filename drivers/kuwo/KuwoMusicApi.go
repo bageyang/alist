@@ -6,9 +6,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/go-resty/resty/v2"
-	log "github.com/sirupsen/logrus"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"strconv"
 	"strings"
@@ -33,11 +33,14 @@ func SearchKuwoMusic(text string, pageNo int, pageSize int) (*SearchRsp, error) 
 	searchDto := new(SearchRsp)
 	rsp, err := client.R().Get(url)
 	if err != nil {
-		log.Fatal("失败：", err)
+		utils.Log.Errorf("失败：%+v", err)
 		return nil, err
 	}
 	validJSON := strings.Replace(string(rsp.Body()), "'", "\"", -1)
 	json.Unmarshal([]byte(validJSON), searchDto)
+	for _, info := range searchDto.AbsList {
+		info.Album = strings.Replace(info.Album, "&nbsp;", "", -1)
+	}
 	return searchDto, nil
 }
 
@@ -56,14 +59,13 @@ func GetDownloadUrl(rid string, format string, bitrate string) *KuwoPlay {
 	url := "http://nmobi.kuwo.cn/mobi.s?f=kuwo&q=" + s
 	rsp, err := csrfGet(url)
 	if err != nil {
-		log.Fatal("获取下载地址失败：", err)
+		utils.Log.Errorf("获取下载地址失败：%+v", err)
 		return nil
 	}
 	body := string(rsp.Body())
 	if body == "" {
 		return nil
 	}
-	log.Info(body)
 	split := strings.Split(body, "\r\n")
 	if len(split) < 2 {
 		return nil
@@ -87,11 +89,11 @@ func GetDownloadUrl(rid string, format string, bitrate string) *KuwoPlay {
 
 const InfoUrl = "https://search.kuwo.cn/r.s?stype=musicinfo&itemset=music_2014&alflac=1&pcmp4=1&ids=%s"
 
-func GetMusicFormat(rid string) *FormatInfo {
-	if len(rid) < 1 || strings.Index(rid, "MUSIC_") < 0 {
+func GetMusicFormat(musicRid string) *FormatInfo {
+	if len(musicRid) < 1 || strings.Index(musicRid, "MUSIC_") < 0 {
 		return nil
 	}
-	url := fmt.Sprintf(InfoUrl, rid)
+	url := fmt.Sprintf(InfoUrl, musicRid)
 	rsp, err := client.R().Get(url)
 	if err != nil {
 		return nil
@@ -218,7 +220,7 @@ func GetMusicLrc(rid string) string {
 		time := lrc.Time
 		f, err := strconv.ParseFloat(time, 64)
 		if err != nil {
-			fmt.Println(err)
+			utils.Log.Errorf("歌词解析错误: %+v", err)
 		}
 		duration := formatDuration(f)
 		builder.WriteString("[" + duration + "]" + lyric)
@@ -257,20 +259,20 @@ func subByStr(src string, left string, right string) string {
 func deflateData(data []byte) string {
 	newBytes := findBytes(data)
 	if newBytes == nil {
-		fmt.Println("没有找到满足条件的字节序列")
+		utils.Log.Error("没有找到满足条件的字节序列")
 		return ""
 	}
 
 	r, err := zlib.NewReader(bytes.NewReader(newBytes))
 	if err != nil {
-		fmt.Println("无法使用zlib解压，错误原因：", err)
+		utils.Log.Errorf("无法使用zlib解压，错误原因: %+v", err)
 		return ""
 	}
 	defer r.Close()
 
-	decompress, err := ioutil.ReadAll(r)
+	decompress, err := io.ReadAll(r)
 	if err != nil {
-		fmt.Println("无法读取解压数据，错误原因：", err)
+		utils.Log.Errorf("无法读取解压数据，错误原因: %+v", err)
 		return ""
 	}
 	return string(decompress)
@@ -399,7 +401,7 @@ func des64(arrLong []int64, l int64) int64 {
 		R = bitTransform(ArrayE, 64, R)
 		R ^= arrLong[i]
 		for j := 0; j < 8; j++ {
-			pR[j] = int(int64(255) & (int64(R) >> (j * 8)))
+			pR[j] = int(int64(255) & (R >> (j * 8)))
 		}
 		SOut = 0
 		for sbi := 7; sbi >= 0; sbi-- {

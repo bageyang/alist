@@ -73,6 +73,13 @@ const (
 	// qbittorrent
 	QbittorrentUrl      = "qbittorrent_url"
 	QbittorrentSeedtime = "qbittorrent_seedtime"
+
+	// music
+	RedisAddr      = "redis_addr"
+	RedisPassword  = "redis_psd"
+	RedisDB        = "redis_db"
+	UploadPath     = "music_upload_path"
+	MusicCachePath = "music_cache_path"
 )
 
 const (
