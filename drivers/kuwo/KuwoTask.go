@@ -167,6 +167,7 @@ func startTask() {
 				}
 			}
 		}
+		time.Sleep(time.Second * 10)
 	}
 	clientMu.Lock()
 	IsRuning = false
