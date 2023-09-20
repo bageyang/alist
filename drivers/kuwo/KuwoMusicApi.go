@@ -227,6 +227,7 @@ func GetMusicLrc(rid string) string {
 		f, err := strconv.ParseFloat(time, 64)
 		if err != nil {
 			utils.Log.Errorf("歌词解析错误: %+v", err)
+			continue
 		}
 		duration := formatDuration(f)
 		builder.WriteString("[" + duration + "]" + lyric)

@@ -67,6 +67,10 @@ func ListDownLoadTask(c *gin.Context) {
 	tasks := kuwo.ListUnHandTask()
 	common.SuccessResp(c, tasks)
 }
+func CleanFailTask(c *gin.Context) {
+	kuwo.CleanFailTask()
+	common.SuccessResp(c)
+}
 
 func fail(c *gin.Context, msg string) {
 	common.ErrorStrResp(c, msg, 500)

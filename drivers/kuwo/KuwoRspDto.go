@@ -14,6 +14,7 @@ type MusicInfo struct {
 	Thumb    string `json:"hts_MVPIC"`
 	MusicRid string `json:"MUSICRID"`
 	Formats  string `json:"FORMATS"`
+	Extra    string `json:"extra"`
 }
 
 type KuwoPlay struct {
@@ -52,4 +53,9 @@ type Ret[T any] struct {
 	Code int    `json:"code"`
 	Data T      `json:"data"`
 	Msg  string `json:"msg"`
+}
+
+type TaskRet struct {
+	ProcessList []MusicInfo `json:"processList"`
+	ErrorList   []MusicInfo `json:"errorList"`
 }
