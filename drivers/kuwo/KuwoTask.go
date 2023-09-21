@@ -185,39 +185,6 @@ func downloadAndUploadMusic(music *MusicInfo) error {
 	if err != nil {
 		return err
 	}
-	//fileInfo, err := os.Stat(musicOutput)
-	//file, err := os.Open(musicOutput)
-	//if err != nil {
-	//	log.Infof("打开文件失败: %+v", err)
-	//	return errors.New("打开文件失败")
-	//}
-	//closers := utils.Closers{}
-	//m := new(model.Music)
-	//m.Name = orgName
-	//m.SourcesId = music.Rid
-	//m.Album = music.Album
-	//m.Artist = music.Artist
-	//m.Size = fileSize
-	//m.Duration = music.DURATION
-	//closer := FileDeleteCloser{file, m}
-	//closers.Add(closer)
-	//s := &stream.FileStream{
-	//	Obj: &model.Object{
-	//		Name:     music.Name,
-	//		Size:     fileInfo.Size(),
-	//		Modified: time.Now(),
-	//	},
-	//	//Reader:       file,
-	//	WebPutAsTask: true,
-	//	Closers:      closers,
-	//}
-	//s.SetTmpFile(file)
-
-	//err = fs.PutAsTask(uploadPah, s)
-	//if err != nil {
-	//	log.Infof("添加上传任务失败: %+v", err)
-	//	return errors.New("打开文件失败")
-	//}
 	err = uploadFile(music.Name, musicOutput)
 	if err != nil {
 		return err
