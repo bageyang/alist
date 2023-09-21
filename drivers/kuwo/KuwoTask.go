@@ -218,7 +218,7 @@ func downloadAndUploadMusic(music *MusicInfo) error {
 	//	log.Infof("添加上传任务失败: %+v", err)
 	//	return errors.New("打开文件失败")
 	//}
-	err = uploadOnLocal(music.Name, musicOutput)
+	err = uploadFile(music.Name, musicOutput)
 	if err != nil {
 		return err
 	}
@@ -240,7 +240,7 @@ func downloadAndUploadMusic(music *MusicInfo) error {
 	return nil
 }
 
-func uploadOnLocal(fileName string, musicPath string) error {
+func uploadFile(fileName string, musicPath string) error {
 	log.Infof("开始上传%+v", musicPath)
 	driver, err := op.GetStorageByMountPath(uploadPah)
 	if err != nil {
@@ -258,11 +258,8 @@ func uploadOnLocal(fileName string, musicPath string) error {
 	if !strings.HasSuffix(diskPath, "/") {
 		diskPath = diskPath + "/"
 	}
-
-	url := fmt.Sprintf(
-		"https://d.pcs.baidu.com/rest/2.0/pcs/file?method=upload&ondup=overwrite&access_token=%s&path=%s%s",
-		accessToken, diskPath, fileName,
-	)
+	diskPath = diskPath + fileName
+	url := fmt.Sprintf("https://d.pcs.baidu.com/rest/2.0/pcs/file?method=upload&ondup=overwrite&access_token=%s&path=%s", accessToken, diskPath)
 	res, err := client.R().SetFile("file", musicPath).Post(url)
 	if err != nil {
 		log.Errorf("上传失败:%+v", err)
@@ -274,14 +271,52 @@ func uploadOnLocal(fileName string, musicPath string) error {
 		log.Errorf("上传失败:%+v", res.String())
 		return errs.NewErr(errs.StreamIncomplete, "上传失败:", res.String())
 	}
+	log.Infof("上传成功")
+	moveMusic(baiduAddition, diskPath, uploadPah, fileName)
 	return nil
 }
 
-func moveMusic(addition *baidu_netdisk.Addition, srcPath string, distPath string) {
-	//url := fmt.Sprintf(
-	//	"https://d.pcs.baidu.com/rest/2.0/xpan/file?method=filemanager&opera=move&async=2",
-	//	accessToken, diskPath, fileName,
-	//)
+type FileManager struct {
+	Path    string `json:"path"`
+	Dest    string `json:"dest"`
+	Newname string `json:"newname"`
+	Ondup   string `json:"ondup"`
+}
+
+func moveMusic(addition *baidu_netdisk.Addition, srcPath string, distPath string, fileName string) {
+	if !strings.HasSuffix(distPath, "/") {
+		distPath = distPath + "/"
+	}
+	url := "http://pan.baidu.com/rest/2.0/xpan/file"
+	params := map[string]string{
+		"method":       "filemanager",
+		"access_token": addition.AccessToken,
+		"opera":        "mover",
+	}
+	fileManager := FileManager{
+		Path:    srcPath,
+		Dest:    distPath,
+		Newname: fileName,
+		Ondup:   "overwrite",
+	}
+	fileManagerArr := []FileManager{fileManager}
+	log.Infof("请求移动文件from: %s  => %s%s", srcPath, distPath, fileName)
+	// 在请求中设置需要提交的form数据
+	rsp, err := client.R().
+		SetFormData(params).
+		SetBody(map[string]interface{}{
+			"async":    2,
+			"filelist": fileManagerArr,
+		}).
+		Post(url)
+	if err != nil {
+		log.Errorf("移动文件失败:%+v", err)
+	}
+	errNo := utils.Json.Get(rsp.Body(), "errno").ToInt()
+	if errNo != 0 {
+		log.Errorf("移动文件失败:%+v", rsp.String())
+	}
+	log.Infof("移动文件成功%s%s", distPath, fileName)
 }
 
 func downloadMusic(music *MusicInfo) (string, int64, error) {
