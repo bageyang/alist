@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/alist-org/alist/v3/drivers/baidu_netdisk"
 	"github.com/alist-org/alist/v3/internal/conf"
 	"github.com/alist-org/alist/v3/internal/db"
-	"github.com/alist-org/alist/v3/internal/fs"
+	"github.com/alist-org/alist/v3/internal/errs"
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/internal/op"
-	"github.com/alist-org/alist/v3/internal/stream"
 	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/alist-org/alist/v3/server/common"
 	"github.com/bogem/id3v2"
@@ -19,6 +20,8 @@ import (
 	"image"
 	"image/jpeg"
 	"os"
+	"reflect"
+	"strings"
 	"sync"
 	"time"
 )
@@ -54,7 +57,6 @@ func init() {
 func watchUploadConfig() {
 	time.Sleep(time.Second * 10)
 	for {
-		time.Sleep(time.Second * 30)
 		groups, err := op.GetSettingItemsByGroup(model.MUSIC)
 		if err != nil {
 			log.Errorf("配置查询失败: %+v", err)
@@ -183,13 +185,43 @@ func downloadAndUploadMusic(music *MusicInfo) error {
 	if err != nil {
 		return err
 	}
-	fileInfo, err := os.Stat(musicOutput)
-	file, err := os.Open(musicOutput)
+	//fileInfo, err := os.Stat(musicOutput)
+	//file, err := os.Open(musicOutput)
+	//if err != nil {
+	//	log.Infof("打开文件失败: %+v", err)
+	//	return errors.New("打开文件失败")
+	//}
+	//closers := utils.Closers{}
+	//m := new(model.Music)
+	//m.Name = orgName
+	//m.SourcesId = music.Rid
+	//m.Album = music.Album
+	//m.Artist = music.Artist
+	//m.Size = fileSize
+	//m.Duration = music.DURATION
+	//closer := FileDeleteCloser{file, m}
+	//closers.Add(closer)
+	//s := &stream.FileStream{
+	//	Obj: &model.Object{
+	//		Name:     music.Name,
+	//		Size:     fileInfo.Size(),
+	//		Modified: time.Now(),
+	//	},
+	//	//Reader:       file,
+	//	WebPutAsTask: true,
+	//	Closers:      closers,
+	//}
+	//s.SetTmpFile(file)
+
+	//err = fs.PutAsTask(uploadPah, s)
+	//if err != nil {
+	//	log.Infof("添加上传任务失败: %+v", err)
+	//	return errors.New("打开文件失败")
+	//}
+	err = uploadOnLocal(music.Name, musicOutput)
 	if err != nil {
-		log.Infof("打开文件失败: %+v", err)
-		return errors.New("打开文件失败")
+		return err
 	}
-	closers := utils.Closers{}
 	m := new(model.Music)
 	m.Name = orgName
 	m.SourcesId = music.Rid
@@ -197,25 +229,59 @@ func downloadAndUploadMusic(music *MusicInfo) error {
 	m.Artist = music.Artist
 	m.Size = fileSize
 	m.Duration = music.DURATION
-	closer := FileDeleteCloser{file, m}
-	closers.Add(closer)
-	s := &stream.FileStream{
-		Obj: &model.Object{
-			Name:     music.Name,
-			Size:     fileInfo.Size(),
-			Modified: time.Now(),
-		},
-		//Reader:       file,
-		WebPutAsTask: true,
-		Closers:      closers,
-	}
-	s.SetTmpFile(file)
-	err = fs.PutAsTask(uploadPah, s)
+	err = db.CreateMusicRecord(m)
 	if err != nil {
-		log.Infof("添加上传任务失败: %+v", err)
-		return errors.New("打开文件失败")
+		log.Errorf("新增歌曲记录异常: %+v", err)
+	}
+	err = os.Remove(musicOutput)
+	if err != nil {
+		log.Errorf("新增歌曲文件异常: %+v", err)
 	}
 	return nil
+}
+
+func uploadOnLocal(fileName string, musicPath string) error {
+	log.Infof("开始上传%+v", musicPath)
+	driver, err := op.GetStorageByMountPath(uploadPah)
+	if err != nil {
+		log.Errorf("获取驱动失败:%+v", err)
+		return err
+	}
+	addition := driver.GetAddition()
+	baiduAddition, ok := addition.(*baidu_netdisk.Addition)
+	if !ok {
+		log.Errorf("无法找到路径对应baidu授权信息:%+v", reflect.TypeOf(addition))
+		return errors.New("无法获取baidu授权信息")
+	}
+	accessToken := baiduAddition.AccessToken
+	diskPath := "/apps/Alist/"
+	if !strings.HasSuffix(diskPath, "/") {
+		diskPath = diskPath + "/"
+	}
+
+	url := fmt.Sprintf(
+		"https://d.pcs.baidu.com/rest/2.0/pcs/file?method=upload&ondup=overwrite&access_token=%s&path=%s%s",
+		accessToken, diskPath, fileName,
+	)
+	res, err := client.R().SetFile("file", musicPath).Post(url)
+	if err != nil {
+		log.Errorf("上传失败:%+v", err)
+		return err
+	}
+	errCode := utils.Json.Get(res.Body(), "error_code").ToInt()
+	errNo := utils.Json.Get(res.Body(), "errno").ToInt()
+	if errCode != 0 || errNo != 0 {
+		log.Errorf("上传失败:%+v", res.String())
+		return errs.NewErr(errs.StreamIncomplete, "上传失败:", res.String())
+	}
+	return nil
+}
+
+func moveMusic(addition *baidu_netdisk.Addition, srcPath string, distPath string) {
+	//url := fmt.Sprintf(
+	//	"https://d.pcs.baidu.com/rest/2.0/xpan/file?method=filemanager&opera=move&async=2",
+	//	accessToken, diskPath, fileName,
+	//)
 }
 
 func downloadMusic(music *MusicInfo) (string, int64, error) {
