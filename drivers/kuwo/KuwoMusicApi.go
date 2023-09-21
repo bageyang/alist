@@ -6,8 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/go-resty/resty/v2"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"math/big"
 	"strconv"
@@ -37,11 +37,14 @@ func SearchKuwoMusic(text string, pageNo int, pageSize int) (*SearchRsp, error) 
 	searchDto := new(SearchRsp)
 	rsp, err := client.R().Get(url)
 	if err != nil {
-		utils.Log.Errorf("失败：%+v", err)
+		log.Errorf("失败：%+v", err)
 		return nil, err
 	}
 	validJSON := strings.Replace(string(rsp.Body()), "'", "\"", -1)
-	json.Unmarshal([]byte(validJSON), searchDto)
+	err = json.Unmarshal([]byte(validJSON), searchDto)
+	if err != nil {
+		return nil, err
+	}
 	for i := range searchDto.AbsList {
 		searchDto.AbsList[i].Album = strings.Replace(searchDto.AbsList[i].Album, "&nbsp;", "-", -1)
 		searchDto.AbsList[i].Artist = strings.Replace(searchDto.AbsList[i].Artist, "&nbsp;", "-", -1)
@@ -56,16 +59,22 @@ func GetDownloadUrl(rid string, format string, bitrate string) *KuwoPlay {
 	}
 	var builder strings.Builder
 	if len(bitrate) == 0 {
-		fmt.Fprintf(&builder, "corp=kuwo&p2p=1&type=convert_url2&format=%s&rid=%s", format, rid)
+		_, err := fmt.Fprintf(&builder, "corp=kuwo&p2p=1&type=convert_url2&format=%s&rid=%s", format, rid)
+		if err != nil {
+			return nil
+		}
 	} else {
-		fmt.Fprintf(&builder, "corp=kuwo&p2p=1&type=convert_url2&format=%s&rid=%s&br=%s", format, rid, bitrate)
+		_, err := fmt.Fprintf(&builder, "corp=kuwo&p2p=1&type=convert_url2&format=%s&rid=%s&br=%s", format, rid, bitrate)
+		if err != nil {
+			return nil
+		}
 	}
 	willEnc := builder.String()
 	s := base64Encrypt(willEnc)
 	url := "http://nmobi.kuwo.cn/mobi.s?f=kuwo&q=" + s
 	rsp, err := csrfGet(url)
 	if err != nil {
-		utils.Log.Errorf("获取下载地址失败：%+v", err)
+		log.Errorf("获取下载地址失败：%+v", err)
 		return nil
 	}
 	body := string(rsp.Body())
@@ -226,7 +235,7 @@ func GetMusicLrc(rid string) string {
 		time := lrc.Time
 		f, err := strconv.ParseFloat(time, 64)
 		if err != nil {
-			utils.Log.Errorf("歌词解析错误: %+v", err)
+			log.Errorf("歌词解析错误: %+v", err)
 			continue
 		}
 		duration := formatDuration(f)
@@ -266,20 +275,25 @@ func subByStr(src string, left string, right string) string {
 func deflateData(data []byte) string {
 	newBytes := findBytes(data)
 	if newBytes == nil {
-		utils.Log.Error("没有找到满足条件的字节序列")
+		log.Error("没有找到满足条件的字节序列")
 		return ""
 	}
 
 	r, err := zlib.NewReader(bytes.NewReader(newBytes))
 	if err != nil {
-		utils.Log.Errorf("无法使用zlib解压，错误原因: %+v", err)
+		log.Errorf("无法使用zlib解压，错误原因: %+v", err)
 		return ""
 	}
-	defer r.Close()
+	defer func(r io.ReadCloser) {
+		err := r.Close()
+		if err != nil {
+			log.Errorf("关闭流失败: %+v", err)
+		}
+	}(r)
 
 	decompress, err := io.ReadAll(r)
 	if err != nil {
-		utils.Log.Errorf("无法读取解压数据，错误原因: %+v", err)
+		log.Errorf("无法读取解压数据，错误原因: %+v", err)
 		return ""
 	}
 	return string(decompress)

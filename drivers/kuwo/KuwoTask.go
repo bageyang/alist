@@ -15,6 +15,7 @@ import (
 	"github.com/alist-org/alist/v3/server/common"
 	"github.com/bogem/id3v2"
 	"github.com/redis/go-redis/v9"
+	log "github.com/sirupsen/logrus"
 	"image"
 	"image/jpeg"
 	"os"
@@ -40,9 +41,9 @@ type FileDeleteCloser struct {
 func (f FileDeleteCloser) Close() error {
 	err := db.CreateMusicRecord(f.modelMusic)
 	if err != nil {
-		utils.Log.Errorf("新增歌曲记录异常: %+v", err)
+		log.Errorf("新增歌曲记录异常: %+v", err)
 	}
-	utils.Log.Infof("删除文件: %+v", f.deletePath)
+	log.Infof("删除文件: %+v", f.deletePath)
 	return f.deletePath.Close()
 }
 
@@ -56,7 +57,7 @@ func watchUploadConfig() {
 		time.Sleep(time.Second * 30)
 		groups, err := op.GetSettingItemsByGroup(model.MUSIC)
 		if err != nil {
-			utils.Log.Errorf("配置查询失败: %+v", err)
+			log.Errorf("配置查询失败: %+v", err)
 			continue
 		}
 		for _, group := range groups {
@@ -65,14 +66,14 @@ func watchUploadConfig() {
 			if key == conf.UploadPath && len(value) > 0 {
 				if uploadPah != value {
 					uploadPah = value
-					utils.Log.Infof("更新上传目录: %+v", uploadPah)
+					log.Infof("更新上传目录: %+v", uploadPah)
 				}
 				continue
 			}
 			if key == conf.MusicCachePath && len(value) > 0 {
 				if CacheDir != value {
 					CacheDir = value
-					utils.Log.Infof("更新临时目录: %+v", CacheDir)
+					log.Infof("更新临时目录: %+v", CacheDir)
 				}
 				continue
 			}
@@ -87,12 +88,12 @@ func HandTask(musicList []MusicInfo) bool {
 	for _, info := range musicList {
 		jsonData, err := json.Marshal(info)
 		if err != nil {
-			utils.Log.Errorf("序列化任务异常: %+v", err)
+			log.Errorf("序列化任务异常: %+v", err)
 			continue
 		}
 		_, err = redisClient.LPush(ctx, MusicTask, jsonData).Result()
 		if err != nil {
-			utils.Log.Errorf("添加任务队列异常: %+v", err)
+			log.Errorf("添加任务队列异常: %+v", err)
 			continue
 		}
 	}
@@ -105,7 +106,7 @@ func CleanFailTask() {
 	redisClient := common.GetRedisClient()
 	_, err := redisClient.Del(ctx, MusicErrTask).Result()
 	if err != nil {
-		utils.Log.Errorf("清除失败队列异常: %+v", err)
+		log.Errorf("清除失败队列异常: %+v", err)
 	}
 }
 func checkTask() {
@@ -130,25 +131,25 @@ func startTask() {
 	for {
 		musicStr, err := redisClient.LPop(ctx, MusicTask).Result()
 		if err == redis.Nil {
-			utils.Log.Info("暂时无任务,结束。。。")
+			log.Info("暂时无任务,结束。。。")
 			break
 		} else if err != nil {
-			utils.Log.Errorf("redis 获取数据错误 %+v", err)
-			utils.Log.Error("redis 获取数据错误 结束本次任务")
+			log.Errorf("redis 获取数据错误 %+v", err)
+			log.Error("redis 获取数据错误 结束本次任务")
 			break
 		} else {
 			music := new(MusicInfo)
 			err := json.Unmarshal([]byte(musicStr), music)
 			if err != nil {
-				utils.Log.Infof("解析任务失败: %+v", musicStr)
+				log.Infof("解析任务失败: %+v", musicStr)
 				continue
 			}
 			name := music.Name
 			artist := music.Artist
-			utils.Log.Infof("开始任务: %+v", music.Name)
+			log.Infof("开始任务: %+v", music.Name)
 			exist, modelMusic := db.ExistMusicByNameAndArtist(name, artist)
 			if exist {
-				utils.Log.Infof("音乐已存在: %+v", modelMusic)
+				log.Infof("音乐已存在: %+v", modelMusic)
 				continue
 			}
 			err = downloadAndUploadMusic(music)
@@ -157,12 +158,12 @@ func startTask() {
 				music.Extra = s
 				jsonData, err := json.Marshal(music)
 				if err != nil {
-					utils.Log.Errorf("写入异常信息失败: %+v", err)
+					log.Errorf("写入异常信息失败: %+v", err)
 					continue
 				}
 				_, err = redisClient.LPush(ctx, MusicErrTask, jsonData).Result()
 				if err != nil {
-					utils.Log.Errorf("添加异常队列异常: %+v", err)
+					log.Errorf("添加异常队列异常: %+v", err)
 					continue
 				}
 			}
@@ -183,7 +184,7 @@ func downloadAndUploadMusic(music *MusicInfo) error {
 	fileInfo, err := os.Stat(musicOutput)
 	file, err := os.Open(musicOutput)
 	if err != nil {
-		utils.Log.Infof("打开文件失败: %+v", err)
+		log.Infof("打开文件失败: %+v", err)
 		return errors.New("打开文件失败")
 	}
 	closers := utils.Closers{}
@@ -209,7 +210,7 @@ func downloadAndUploadMusic(music *MusicInfo) error {
 	s.SetTmpFile(file)
 	err = fs.PutAsTask(uploadPah, s)
 	if err != nil {
-		utils.Log.Infof("添加上传任务失败: %+v", err)
+		log.Infof("添加上传任务失败: %+v", err)
 		return errors.New("打开文件失败")
 	}
 	return nil
@@ -226,25 +227,25 @@ func downloadMusic(music *MusicInfo) (string, int64, error) {
 	musicOutput := CacheDir + fileName
 	_, err := client.R().SetOutput(CacheDir + music.Name).Get(url)
 	if err != nil {
-		utils.Log.Errorf("下载歌曲失败: %+v", err)
+		log.Errorf("下载歌曲失败: %+v", err)
 		return "", 0, errors.New("下载歌曲失败")
 	} else {
-		utils.Log.Infof("下载歌曲成功: %+v", musicOutput)
+		log.Infof("下载歌曲成功: %+v", musicOutput)
 	}
 	picList := SearchMusicPic(rid)
 	picOutput := CacheDir + music.Rid + ".jpg"
 	_, picErr := client.R().SetOutput(picOutput).Get(picList[0])
 	if picErr != nil {
-		utils.Log.Errorf("下载图片失败: %+v", picErr)
+		log.Errorf("下载图片失败: %+v", picErr)
 		picOutput = ""
 	} else {
-		utils.Log.Infof("下载图片成功: %+v", picOutput)
+		log.Infof("下载图片成功: %+v", picOutput)
 	}
 	lrc := GetMusicLrc(rid)
 	FillMusicId3Tag(musicOutput, picOutput, lrc, *music)
 	err = os.Remove(picOutput)
 	if err != nil {
-		utils.Log.Infof("删除图片失败: %+v", picOutput)
+		log.Infof("删除图片失败: %+v", picOutput)
 	}
 	return musicOutput, format.Size, nil
 }
@@ -252,7 +253,7 @@ func downloadMusic(music *MusicInfo) (string, int64, error) {
 func FillMusicId3Tag(musicPath string, imagePath string, lyrics string, musicInfo MusicInfo) {
 	tag, err := id3v2.Open(musicPath, id3v2.Options{Parse: true})
 	if err != nil {
-		utils.Log.Errorf("打开文件错误: %+v", err)
+		log.Errorf("打开文件错误: %+v", err)
 		return
 	}
 
@@ -288,7 +289,7 @@ func FillMusicId3Tag(musicPath string, imagePath string, lyrics string, musicInf
 	})
 
 	if err = tag.Save(); err != nil {
-		utils.Log.Errorf("写入标签错误: %+v", err)
+		log.Errorf("写入标签错误: %+v", err)
 	}
 
 	err = tag.Close()
@@ -302,12 +303,12 @@ func ListUnHandTask() TaskRet {
 	redisClient := common.GetRedisClient()
 	result, err := redisClient.LRange(ctx, MusicTask, 0, 99).Result()
 	if err != nil {
-		utils.Log.Errorf("获取任务队列错误: %+v", err)
+		log.Errorf("获取任务队列错误: %+v", err)
 		return *new(TaskRet)
 	}
 	errResult, err := redisClient.LRange(ctx, MusicErrTask, 0, 99).Result()
 	if err != nil {
-		utils.Log.Errorf("获取任务队列错误: %+v", err)
+		log.Errorf("获取任务队列错误: %+v", err)
 		return *new(TaskRet)
 	}
 	size := len(result)
@@ -321,7 +322,7 @@ func ListUnHandTask() TaskRet {
 		music := new(MusicInfo)
 		err := json.Unmarshal([]byte(s), music)
 		if err != nil {
-			utils.Log.Error("json 反序列化错误: %+v", err)
+			log.Error("json 反序列化错误: %+v", err)
 			continue
 		}
 		musicList = append(musicList, *music)
@@ -331,7 +332,7 @@ func ListUnHandTask() TaskRet {
 		music := new(MusicInfo)
 		err := json.Unmarshal([]byte(s), music)
 		if err != nil {
-			utils.Log.Error("json 反序列化错误: %+v", err)
+			log.Error("json 反序列化错误: %+v", err)
 			continue
 		}
 		errorList = append(errorList, *music)
