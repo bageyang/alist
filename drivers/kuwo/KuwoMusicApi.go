@@ -61,11 +61,13 @@ func GetDownloadUrl(rid string, format string, bitrate string) *KuwoPlay {
 	if len(bitrate) == 0 {
 		_, err := fmt.Fprintf(&builder, "corp=kuwo&p2p=1&type=convert_url2&format=%s&rid=%s", format, rid)
 		if err != nil {
+			log.Errorf("格式化url错误:%+v", err)
 			return nil
 		}
 	} else {
 		_, err := fmt.Fprintf(&builder, "corp=kuwo&p2p=1&type=convert_url2&format=%s&rid=%s&br=%s", format, rid, bitrate)
 		if err != nil {
+			log.Errorf("格式化url错误:%+v", err)
 			return nil
 		}
 	}
@@ -79,10 +81,12 @@ func GetDownloadUrl(rid string, format string, bitrate string) *KuwoPlay {
 	}
 	body := string(rsp.Body())
 	if body == "" {
+		log.Errorf("获取下载地址失败：%+v", body)
 		return nil
 	}
 	split := strings.Split(body, "\r\n")
 	if len(split) < 2 {
+		log.Errorf("获取下载地址失败：%+v", body)
 		return nil
 	}
 	mapKeyValue := make(map[string]string)
@@ -106,19 +110,23 @@ const InfoUrl = "https://search.kuwo.cn/r.s?stype=musicinfo&itemset=music_2014&a
 
 func GetMusicFormat(musicRid string) *FormatInfo {
 	if len(musicRid) < 1 || strings.Index(musicRid, "MUSIC_") < 0 {
+		log.Errorf("音乐id有误：%+v", musicRid)
 		return nil
 	}
 	url := fmt.Sprintf(InfoUrl, musicRid)
 	rsp, err := client.R().Get(url)
 	if err != nil {
+		log.Errorf("查询歌曲信息失败: %+v", err)
 		return nil
 	}
 	data := deflateData(rsp.Body())
 	if len(data) < 1 {
+		log.Errorf("解密format失败: %+v", err)
 		return nil
 	}
 	split := strings.Split(data, "\r\n")
 	if len(split) < 1 {
+		log.Errorf("解密format失败: %+v", data)
 		return nil
 	}
 	tmp := int64(0)
@@ -166,11 +174,13 @@ func SearchMusicPic(rid string) []string {
 	url := fmt.Sprintf(MusicPicUrl, rid)
 	rsp, err := client.R().Get(url)
 	if err != nil {
+		log.Errorf("搜索图片请求错误:%+v", err)
 		return nil
 	}
 	k := new(KuwoPicRsp)
 	err = json.Unmarshal(rsp.Body(), &k)
 	if err != nil {
+		log.Errorf("搜索图片解析错误:%+v", err)
 		return nil
 	}
 	list := k.PicList
@@ -215,18 +225,22 @@ func GetMusicLrc(rid string) string {
 		SetHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36").
 		Get(url)
 	if err != nil {
+		log.Errorf("获取歌词请求错误:%+v", err)
 		return ""
 	}
 	k := new(LrcRsp)
 	err = json.Unmarshal(rsp.Body(), &k)
 	if err != nil {
+		log.Errorf("获取歌词请求解析错误:%+v", err)
 		return ""
 	}
 	if k.Status != 200 {
+		log.Errorf("获取歌词请求错误:%+v", k)
 		return ""
 	}
 
 	if len(k.LrcData.LrcList) == 0 {
+		log.Errorf("获取歌词内容为空:%+v", k)
 		return ""
 	}
 	var builder strings.Builder

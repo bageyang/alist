@@ -152,6 +152,7 @@ func startTask() {
 				log.Infof("音乐已存在: %+v", modelMusic)
 				continue
 			}
+			log.Infof("新曲目,开始下载")
 			err = downloadAndUploadMusic(music)
 			if err != nil {
 				s := err.Error()
@@ -170,6 +171,7 @@ func startTask() {
 		}
 		time.Sleep(time.Second * 10)
 	}
+	log.Info("队列暂无下载任务,结束。。。")
 	clientMu.Lock()
 	IsRuning = false
 	clientMu.Unlock()
@@ -294,6 +296,7 @@ func FillMusicId3Tag(musicPath string, imagePath string, lyrics string, musicInf
 
 	err = tag.Close()
 	if err != nil {
+		log.Errorf("写入标签错误: %+v", err)
 		return
 	}
 }
