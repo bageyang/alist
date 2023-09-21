@@ -222,7 +222,13 @@ func downloadMusic(music *MusicInfo) (string, int64, error) {
 	rid := music.Rid
 	musicRid := music.MusicRid
 	format := GetMusicFormat(musicRid)
+	if format == nil {
+		return "", 0, errors.New("下载歌曲失败")
+	}
 	kuwoPlay := GetDownloadUrl(rid, format.Format, format.Bitrate)
+	if kuwoPlay == nil {
+		return "", 0, errors.New("下载歌曲失败")
+	}
 	url := kuwoPlay.Url
 	fileName := music.Artist + "-" + music.Name + "." + format.Format
 	music.Name = fileName
@@ -236,12 +242,16 @@ func downloadMusic(music *MusicInfo) (string, int64, error) {
 	}
 	picList := SearchMusicPic(rid)
 	picOutput := CacheDir + music.Rid + ".jpg"
-	_, picErr := client.R().SetOutput(picOutput).Get(picList[0])
-	if picErr != nil {
-		log.Errorf("下载图片失败: %+v", picErr)
+	if picList == nil {
 		picOutput = ""
 	} else {
-		log.Infof("下载图片成功: %+v", picOutput)
+		_, picErr := client.R().SetOutput(picOutput).Get(picList[0])
+		if picErr != nil {
+			log.Errorf("下载图片失败: %+v", picErr)
+			picOutput = ""
+		} else {
+			log.Infof("下载图片成功: %+v", picOutput)
+		}
 	}
 	lrc := GetMusicLrc(rid)
 	FillMusicId3Tag(musicOutput, picOutput, lrc, *music)
