@@ -292,6 +292,7 @@ func sliceUpload(accessToken string, arg *UploadArg) (UploadReturn, error) {
 		return ret, err
 	}
 	if err := json.Unmarshal([]byte(body), &ret); err != nil {
+		log.Errorf("分片上传解析返回值异常:%+v", body)
 		return ret, errors.New("unmarshal body failed")
 
 	}
