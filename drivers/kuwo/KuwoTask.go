@@ -5,16 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/alist-org/alist/v3/drivers/baidu_netdisk"
 	"github.com/alist-org/alist/v3/internal/conf"
 	"github.com/alist-org/alist/v3/internal/db"
-	"github.com/alist-org/alist/v3/internal/errs"
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/internal/op"
-	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/alist-org/alist/v3/server/common"
 	"github.com/bogem/id3v2"
+	"github.com/jsyzchen/pan/file"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
 	"image"
@@ -34,7 +32,7 @@ var IsRuning = false
 
 var clientMu sync.Mutex
 
-var uploadPah = "/"
+var uploadPah = "/music/"
 
 type FileDeleteCloser struct {
 	deletePath *os.File
@@ -221,69 +219,27 @@ func uploadFile(fileName string, musicPath string) error {
 		return errors.New("无法获取baidu授权信息")
 	}
 	accessToken := baiduAddition.AccessToken
+
 	diskPath := "/apps/Alist/"
 	if !strings.HasSuffix(diskPath, "/") {
 		diskPath = diskPath + "/"
 	}
 	diskPath = diskPath + fileName
-	url := fmt.Sprintf("https://d.pcs.baidu.com/rest/2.0/pcs/file?method=upload&ondup=overwrite&access_token=%s&path=%s", accessToken, diskPath)
-	res, err := client.R().SetFile("file", musicPath).Post(url)
+	uploader := file.NewUploader(accessToken, diskPath, musicPath)
+	_, err = uploader.Upload()
 	if err != nil {
 		log.Errorf("上传失败:%+v", err)
 		return err
 	}
-	errCode := utils.Json.Get(res.Body(), "error_code").ToInt()
-	errNo := utils.Json.Get(res.Body(), "errno").ToInt()
-	if errCode != 0 || errNo != 0 {
-		log.Errorf("上传失败:%+v", res.String())
-		return errs.NewErr(errs.StreamIncomplete, "上传失败:", res.String())
-	}
 	log.Infof("上传成功")
-	moveMusic(baiduAddition, diskPath, uploadPah, fileName)
-	return nil
-}
-
-type FileManager struct {
-	Path    string `json:"path"`
-	Dest    string `json:"dest"`
-	Newname string `json:"newname"`
-	Ondup   string `json:"ondup"`
-}
-
-func moveMusic(addition *baidu_netdisk.Addition, srcPath string, distPath string, fileName string) {
-	if !strings.HasSuffix(distPath, "/") {
-		distPath = distPath + "/"
-	}
-	url := "http://pan.baidu.com/rest/2.0/xpan/file"
-	params := map[string]string{
-		"method":       "filemanager",
-		"access_token": addition.AccessToken,
-		"opera":        "mover",
-	}
-	fileManager := FileManager{
-		Path:    srcPath,
-		Dest:    distPath,
-		Newname: fileName,
-		Ondup:   "overwrite",
-	}
-	fileManagerArr := []FileManager{fileManager}
-	log.Infof("请求移动文件from: %s  => %s%s", srcPath, distPath, fileName)
-	// 在请求中设置需要提交的form数据
-	rsp, err := client.R().
-		SetFormData(params).
-		SetBody(map[string]interface{}{
-			"async":    2,
-			"filelist": fileManagerArr,
-		}).
-		Post(url)
+	log.Infof("开始移动文件,from: %s  ==>  %s%s", diskPath, uploadPah, fileName)
+	err = MoveFile(baiduAddition.AccessToken, diskPath, uploadPah, fileName)
 	if err != nil {
-		log.Errorf("移动文件失败:%+v", err)
+		log.Errorf("移动文件失败: %+v", err)
+	} else {
+		log.Infof("移动文件成功")
 	}
-	errNo := utils.Json.Get(rsp.Body(), "errno").ToInt()
-	if errNo != 0 {
-		log.Errorf("移动文件失败:%+v", rsp.String())
-	}
-	log.Infof("移动文件成功%s%s", distPath, fileName)
+	return nil
 }
 
 func downloadMusic(music *MusicInfo) (string, int64, error) {
