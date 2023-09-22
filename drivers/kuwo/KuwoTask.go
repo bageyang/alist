@@ -12,7 +12,6 @@ import (
 	"github.com/alist-org/alist/v3/internal/op"
 	"github.com/alist-org/alist/v3/server/common"
 	"github.com/bogem/id3v2"
-	"github.com/jsyzchen/pan/file"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
 	"image"
@@ -226,26 +225,32 @@ func uploadFile(fileName string, musicPath string) (error error) {
 	}
 	accessToken := baiduAddition.AccessToken
 
-	diskPath := "/apps/Alist/"
-	if !strings.HasSuffix(diskPath, "/") {
-		diskPath = diskPath + "/"
-	}
+	diskPath := getPathWithSlash("/apps/Alist/")
 	diskPath = diskPath + fileName
-	uploader := file.NewUploader(accessToken, diskPath, musicPath)
-	_, err = uploader.Upload()
+	moveFilePath := getPathWithSlash(uploadPah)
+
+	err = Upload(accessToken, musicPath, fileName)
 	if err != nil {
 		log.Errorf("上传失败:%+v", err)
 		return err
 	}
 	log.Infof("上传成功")
-	log.Infof("开始移动文件,from: %s  ==>  %s%s", diskPath, uploadPah, fileName)
-	err = MoveFile(baiduAddition.AccessToken, diskPath, uploadPah, fileName)
+	log.Infof("开始移动文件,from: %s  ==>  %s%s", diskPath, moveFilePath, fileName)
+	err = MoveFile(baiduAddition.AccessToken, diskPath, moveFilePath, fileName)
 	if err != nil {
 		log.Errorf("移动文件失败: %+v", err)
 	} else {
 		log.Infof("移动文件成功")
 	}
 	return nil
+}
+
+func getPathWithSlash(path string) string {
+	if !strings.HasSuffix(path, "/") {
+		return path + "/"
+	} else {
+		return path
+	}
 }
 
 func downloadMusic(music *MusicInfo) (string, int64, error) {
