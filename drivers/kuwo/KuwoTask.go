@@ -205,7 +205,13 @@ func downloadAndUploadMusic(music *MusicInfo) error {
 	return nil
 }
 
-func uploadFile(fileName string, musicPath string) error {
+func uploadFile(fileName string, musicPath string) (error error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("捕获异常: %+v", r)
+			error = errors.New("未知错误")
+		}
+	}()
 	log.Infof("开始上传%+v", musicPath)
 	driver, err := op.GetStorageByMountPath(uploadPah)
 	if err != nil {
